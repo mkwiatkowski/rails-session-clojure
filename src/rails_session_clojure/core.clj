@@ -74,18 +74,28 @@
 (def default-signature-salt "signed encrypted cookie")
 (def default-encryption-salt "encrypted cookie")
 
-(defn create-session-decryptor
+(defn- create-session-handling-function
+  "Returns a function that will be able to handle session data: either encrypt
+  or decrypt it, depending on the callback.
+  The callback will be called with a message, signature secret and encryption
+  secret."
+  ([callback secret-key-base]
+   (create-session-handling-function callback secret-key-base default-signature-salt default-encryption-salt))
+  ([callback secret-key-base signature-salt encryption-salt]
+   (let [signature-secret (pbkdf2 secret-key-base signature-salt 64)
+         encryption-secret (pbkdf2 secret-key-base encryption-salt 32)]
+     (fn [message]
+       (callback message signature-secret encryption-secret)))))
+
+(defn create-session-decryptor [& args]
   "Returns a function that when called will decode an encoded session string.
 
   secret-key-base - (String) value of secret_key_base usually found in config/secrets.yml
   signature-salt  - (String) value of 'config.action_dispatch.encrypted_cookie_salt'
   encryption-salt - (String) value of 'config.action_dispatch.encrypted_signed_cookie_salt'"
-  ([secret-key-base]
-   (create-session-decryptor secret-key-base default-signature-salt default-encryption-salt))
-  ([secret-key-base signature-salt encryption-salt]
-   (let [signature-secret (pbkdf2 secret-key-base signature-salt 64)
-         encryption-secret (pbkdf2 secret-key-base encryption-salt 32)]
-     (fn [message]
-       (if-let [verified-message (verify-signature message signature-secret)]
-         (if-let [decrypted-message (run-crypto Cipher/DECRYPT_MODE verified-message encryption-secret)]
-           (json/parse-string decrypted-message)))))))
+  (apply create-session-handling-function
+         (fn [message signature-secret encryption-secret]
+           (if-let [verified-message (verify-signature message signature-secret)]
+             (if-let [decrypted-message (run-crypto Cipher/DECRYPT_MODE verified-message encryption-secret)]
+               (json/parse-string decrypted-message))))
+         args))
