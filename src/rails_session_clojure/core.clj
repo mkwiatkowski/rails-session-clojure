@@ -56,15 +56,16 @@
     (.init cipher (int mode) key-spec iv-spec)
     cipher))
 
-(defn- decrypt
-  "Returns decrypted message when decryption is successful or nil otherwise.
+(defn- run-crypto
+  "Returns crypted/decrypted message depending on mode. Returns nil when unsuccessful.
+  mode    - (int)    Cipher/ENCRYPT_MODE or Cipher/DECRYPT_MODE
   message - (String) message to be decrypted
   secret  - (byte[]) encryption secret"
-  [message secret]
+  [mode message secret]
   ^String
   (try
     (let [[data iv] (map #(base64/decode-bytes (.getBytes %)) (separate-data-and-padding message))
-          cipher (get-cipher Cipher/DECRYPT_MODE secret iv)]
+          cipher (get-cipher mode secret iv)]
       (String. (.doFinal cipher data 0 (count data))))
     (catch java.lang.IllegalArgumentException _ nil)
     (catch java.security.InvalidAlgorithmParameterException _ nil)
@@ -86,5 +87,5 @@
          encryption-secret (pbkdf2 secret-key-base encryption-salt 32)]
      (fn [message]
        (if-let [verified-message (verify-signature message signature-secret)]
-         (if-let [decrypted-message (decrypt verified-message encryption-secret)]
+         (if-let [decrypted-message (run-crypto Cipher/DECRYPT_MODE verified-message encryption-secret)]
            (json/parse-string decrypted-message)))))))
