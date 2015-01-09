@@ -11,7 +11,7 @@
    [pandect.core :as pandect]))
 
 ;; Based on http://adambard.com/blog/3-wrong-ways-to-store-a-password/
-(defn- pbkdf2
+(defn pbkdf2
   "Returns bytes array of the specified length derived from applying PBKDF2
   to the given key and salt.
   key           - (String) key/password
@@ -25,22 +25,22 @@
         factory (SecretKeyFactory/getInstance "PBKDF2WithHmacSHA1")]
     (.getEncoded (.generateSecret factory key-spec))))
 
-(defn- separate-data-and-padding [message]
+(defn separate-data-and-padding [message]
   (str/split message #"--"))
 
-(defn- combine-data-and-padding [data padding]
+(defn combine-data-and-padding [data padding]
   (str data #"--" padding))
 
-(defn- separate-and-decode [message]
+(defn separate-and-decode [message]
   (map #(base64/decode-bytes (.getBytes %)) (separate-data-and-padding message)))
 
-(defn- encode-and-combine [padding data]
+(defn encode-and-combine [padding data]
   (apply combine-data-and-padding (map #(String. (base64/encode-bytes %)) [data padding])))
 
-(defn- generate-random-iv []
+(defn generate-random-iv []
   (random/bytes 16))
 
-(defn- verify-signature
+(defn verify-signature
   "Returns data section of the message if the signature is valid or nil otherwise.
   message - (String) message to be validated
   secret  - (byte[]) secret to be used during hashing"
@@ -52,7 +52,7 @@
              (crypto/eq? received-digest (pandect/sha1-hmac data secret)))
       (base64/decode data))))
 
-(defn- add-signature
+(defn add-signature
   "Returns a base64-encoded message combined with its signature.
   secret  - (byte[]) secret to be used during hashing
   message - (String) message to generate signature for"
@@ -62,13 +62,13 @@
         signature (pandect/sha1-hmac encoded-message secret)]
     (combine-data-and-padding encoded-message signature)))
 
-(defn- json-parse-bytes [message]
+(defn json-parse-bytes [message]
   (json/parse-string (String. message)))
 
-(defn- json-generate-bytes [message]
+(defn json-generate-bytes [message]
   (.getBytes (json/generate-string message)))
 
-(defn- run-crypto
+(defn run-crypto
   "Returns crypted/decrypted message depending on mode. Raises an exception
   when unsuccessful.
   mode   - (int)    Cipher/ENCRYPT_MODE or Cipher/DECRYPT_MODE
@@ -92,7 +92,7 @@
 (def default-signature-salt "signed encrypted cookie")
 (def default-encryption-salt "encrypted cookie")
 
-(defn- calculate-secrets
+(defn calculate-secrets
   "Returns signature and encryption secrets in a vector."
   ([secret-key-base]
    (calculate-secrets secret-key-base default-signature-salt default-encryption-salt))

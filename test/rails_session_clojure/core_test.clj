@@ -42,10 +42,28 @@
       ;; iv decodes on second pass to "itissixteenbytes", but fails on decrypting
       (is (nil? (decrypt-session "dGVzdC0tYVhScGMzTnBlSFJsWlc1aWVYUmxjdz09--9cea6add243a54f9390dd780b94024464ab37c73"))))))
 
-(deftest test-encrypt-decrypt-interaction
+(deftest test-create-session-encryptor-decryptor-interaction
   (let [secret-key-base "super secret"
         encrypt (create-session-encryptor secret-key-base)
         decrypt (create-session-decryptor secret-key-base)
         value   {"string" "value", "number" 42, "array" [1 2]}]
     (testing "decrypt should successfully decrypt what encrypt encrypted"
       (is (= value (decrypt (encrypt value)))))))
+
+(deftest test-add-verify-signature-interaction
+  (let [secret "abcd"
+        message "hello world"]
+    (testing "verify-signature should return message signed with add-signature"
+      (is (= message
+             (verify-signature (add-signature secret message) secret))))
+    (testing "verify-signature should return nil when given a wrong secret"
+      (is (nil? (verify-signature (add-signature secret message) "wrong-secret"))))))
+
+(deftest test-calculate-secrets
+  (let [secret-key-base "secret"]
+    (testing "calculate-secrets should return two secrets"
+      (is (= 2 (count (calculate-secrets secret-key-base)))))
+    (testing "calculate-secrets' first secret should have length of 64"
+      (is (= 64 (count (first (calculate-secrets secret-key-base))))))
+    (testing "calculate-secrets' second secret should have length of 32"
+      (is (= 32 (count (second (calculate-secrets secret-key-base))))))))
