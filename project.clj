@@ -8,4 +8,8 @@
                  [crypto-equality "1.0.0"]
                  [crypto-random "1.2.0"]
                  [org.clojure/clojure "1.6.0"]
-                 [pandect "0.4.1"]])
+                 [pandect "0.4.1"]]
+  :plugins [[codox "0.8.10"]]
+  :codox {:src-dir-uri "https://github.com/mkwiatkowski/rails-session-clojure/blob/master/"
+          :src-linenum-anchor-prefix "L"
+          :output-dir "."})
