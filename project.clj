@@ -1,4 +1,4 @@
-(defproject rails-session-clojure "0.1.0-SNAPSHOT"
+(defproject rails-session-clojure "0.1.0"
   :description "Integration with Ruby on Rails encoded and signed session cookies"
   :url "https://github.com/mkwiatkowski/rails-session-clojure"
   :license {:name "Eclipse Public License"
