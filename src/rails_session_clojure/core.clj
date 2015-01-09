@@ -92,52 +92,45 @@
 (def default-signature-salt "signed encrypted cookie")
 (def default-encryption-salt "encrypted cookie")
 
-(defn- create-session-handling-function
-  "Returns a function that will be able to handle session data: either encrypt
-  or decrypt it, depending on the callback.
-  The callback will be called with a message, signature secret and encryption
-  secret."
-  ([callback secret-key-base]
-   (create-session-handling-function callback secret-key-base default-signature-salt default-encryption-salt))
-  ([callback secret-key-base signature-salt encryption-salt]
-   (let [signature-secret (pbkdf2 secret-key-base signature-salt 64)
-         encryption-secret (pbkdf2 secret-key-base encryption-salt 32)]
-     (fn [message]
-       (callback message signature-secret encryption-secret)))))
+(defn- calculate-secrets
+  "Returns signature and encryption secrets in a vector."
+  ([secret-key-base]
+   (calculate-secrets secret-key-base default-signature-salt default-encryption-salt))
+  ([secret-key-base signature-salt encryption-salt]
+   [(pbkdf2 secret-key-base signature-salt 64)
+    (pbkdf2 secret-key-base encryption-salt 32)]))
 
-(defn create-session-decryptor [& args]
+(defn create-session-decryptor [& config]
   "Returns a function that when called will verify signature, decrypt a session
   string and deserialize the resulting json data into a map structure.
 
   secret-key-base - (String) value of secret_key_base usually found in config/secrets.yml
   signature-salt  - (String) value of 'config.action_dispatch.encrypted_cookie_salt'
   encryption-salt - (String) value of 'config.action_dispatch.encrypted_signed_cookie_salt'"
-  (apply create-session-handling-function
-         (fn [message signature-secret encryption-secret]
-           (try
-             (if-let [verified-message (verify-signature message signature-secret)]
-               (let [[data iv] (separate-and-decode verified-message)]
-                 (->> data
-                      (decrypt encryption-secret iv)
-                      (json-parse-bytes))))
-             (catch java.lang.IllegalArgumentException _ nil)
-             (catch java.security.InvalidAlgorithmParameterException _ nil)
-             (catch javax.crypto.IllegalBlockSizeException _ nil)))
-         args))
+  (let [[signature-secret encryption-secret] (apply calculate-secrets config)]
+    (fn [message]
+      (try
+        (if-let [verified-message (verify-signature message signature-secret)]
+          (let [[data iv] (separate-and-decode verified-message)]
+            (->> data
+                 (decrypt encryption-secret iv)
+                 (json-parse-bytes))))
+        (catch java.lang.IllegalArgumentException _ nil)
+        (catch java.security.InvalidAlgorithmParameterException _ nil)
+        (catch javax.crypto.IllegalBlockSizeException _ nil)))))
 
-(defn create-session-encryptor [& args]
+(defn create-session-encryptor [& config]
   "Returns a function that when called will serialize session hash to json,
   encrypt and sign it.
 
   secret-key-base - (String) value of secret_key_base usually found in config/secrets.yml
   signature-salt  - (String) value of 'config.action_dispatch.encrypted_cookie_salt'
   encryption-salt - (String) value of 'config.action_dispatch.encrypted_signed_cookie_salt'"
-  (apply create-session-handling-function
-         (fn [message signature-secret encryption-secret]
-           (let [iv (generate-random-iv)]
-             (->> message
-                  (json-generate-bytes)
-                  (encrypt encryption-secret iv)
-                  (encode-and-combine iv)
-                  (add-signature signature-secret))))
-         args))
+  (let [[signature-secret encryption-secret] (apply calculate-secrets config)]
+    (fn [message]
+      (let [iv (generate-random-iv)]
+        (->> message
+             (json-generate-bytes)
+             (encrypt encryption-secret iv)
+             (encode-and-combine iv)
+             (add-signature signature-secret))))))
