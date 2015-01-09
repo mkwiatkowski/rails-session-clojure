@@ -9,8 +9,9 @@
         encrypt-session (create-session-encryptor secret-key-base)]
 
     (testing "encrypt-session successfully encrypts hash into a string"
-      (is (= "aDA3ZDdzYkQ5MUZlYXZlN0I1cWRRQT09LS1ZV0ZoWVdKaVltSmpZMk5qWkdSa1pBPT0=--42e6e21f6b2784e6cdd4dde35bc63f9d1f12a183"
-             (encrypt-session {"some" "data"}))))))
+      (let [value (encrypt-session {"some" "data"})]
+        (is (= (string? value)))
+        (is (= 110 (count value)))))))
 
 (deftest test-create-session-decryptor
   (let [secret-key-base "abcd"

@@ -6,5 +6,6 @@
   :dependencies [[base64-clj "0.1.1"]
                  [cheshire "5.4.0"]
                  [crypto-equality "1.0.0"]
+                 [crypto-random "1.2.0"]
                  [org.clojure/clojure "1.6.0"]
                  [pandect "0.4.1"]])

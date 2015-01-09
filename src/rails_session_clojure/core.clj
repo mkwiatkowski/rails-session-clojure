@@ -7,6 +7,7 @@
    [cheshire.core :as json]
    [clojure.string :as str]
    [crypto.equality :as crypto]
+   [crypto.random :as random]
    [pandect.core :as pandect]))
 
 ;; Based on http://adambard.com/blog/3-wrong-ways-to-store-a-password/
@@ -37,7 +38,7 @@
   (apply combine-data-and-padding (map #(String. (base64/encode-bytes %)) [data padding])))
 
 (defn- generate-random-iv []
-  (.getBytes "aaaabbbbccccdddd")) ;; TODO
+  (random/bytes 16))
 
 (defn- verify-signature
   "Returns data section of the message if the signature is valid or nil otherwise.
