@@ -34,7 +34,7 @@
 (defn- separate-and-decode [message]
   (map #(base64/decode-bytes (.getBytes %)) (separate-data-and-padding message)))
 
-(defn- encode-and-combine [data padding]
+(defn- encode-and-combine [padding data]
   (apply combine-data-and-padding (map #(String. (base64/encode-bytes %)) [data padding])))
 
 (defn- generate-random-iv []
@@ -54,9 +54,9 @@
 
 (defn- add-signature
   "Returns a base64-encoded message combined with its signature.
-  message - (String) message to generate signature for
-  secret  - (byte[]) secret to be used during hashing"
-  [message secret]
+  secret  - (byte[]) secret to be used during hashing
+  message - (String) message to generate signature for"
+  [secret message]
   ^String
   (let [encoded-message (base64/encode message)
         signature (pandect/sha1-hmac encoded-message secret)]
@@ -73,9 +73,9 @@
   when unsuccessful.
   mode   - (int)    Cipher/ENCRYPT_MODE or Cipher/DECRYPT_MODE
   secret - (byte[]) encryption secret
-  data   - (byte[]) data to be en/de-crypted
-  iv     - (byte[]) initialization vector"
-  [mode data secret iv]
+  iv     - (byte[]) initialization vector
+  data   - (byte[]) data to be en/de-crypted"
+  [mode secret iv data]
   ^bytes
   (let [key-spec (SecretKeySpec. secret "AES")
         iv-spec  (IvParameterSpec. iv)
@@ -83,11 +83,11 @@
     (.init cipher (int mode) key-spec iv-spec)
     (.doFinal cipher data)))
 
-(defn decrypt [data secret iv]
-  (run-crypto Cipher/DECRYPT_MODE data secret iv))
+(defn decrypt [secret iv data]
+  (run-crypto Cipher/DECRYPT_MODE secret iv data))
 
-(defn encrypt [data secret iv]
-  (run-crypto Cipher/ENCRYPT_MODE data secret iv))
+(defn encrypt [secret iv data]
+  (run-crypto Cipher/ENCRYPT_MODE secret iv data))
 
 (def default-signature-salt "signed encrypted cookie")
 (def default-encryption-salt "encrypted cookie")
@@ -106,8 +106,8 @@
        (callback message signature-secret encryption-secret)))))
 
 (defn create-session-decryptor [& args]
-  "Returns a function that when called will verify signature, decode an encoded session string
-  and deserialize the resulting json data into a map structure.
+  "Returns a function that when called will verify signature, decrypt a session
+  string and deserialize the resulting json data into a map structure.
 
   secret-key-base - (String) value of secret_key_base usually found in config/secrets.yml
   signature-salt  - (String) value of 'config.action_dispatch.encrypted_cookie_salt'
@@ -116,25 +116,28 @@
          (fn [message signature-secret encryption-secret]
            (try
              (if-let [verified-message (verify-signature message signature-secret)]
-               (let [[data iv] (separate-and-decode verified-message)
-                     decrypted-message (decrypt data encryption-secret iv)]
-                 (json-parse-bytes decrypted-message)))
+               (let [[data iv] (separate-and-decode verified-message)]
+                 (->> data
+                      (decrypt encryption-secret iv)
+                      (json-parse-bytes))))
              (catch java.lang.IllegalArgumentException _ nil)
              (catch java.security.InvalidAlgorithmParameterException _ nil)
              (catch javax.crypto.IllegalBlockSizeException _ nil)))
          args))
 
 (defn create-session-encryptor [& args]
-  "Returns a function that when called will serialize session hash to json, sign it and encode it.
+  "Returns a function that when called will serialize session hash to json,
+  encrypt and sign it.
 
   secret-key-base - (String) value of secret_key_base usually found in config/secrets.yml
   signature-salt  - (String) value of 'config.action_dispatch.encrypted_cookie_salt'
   encryption-salt - (String) value of 'config.action_dispatch.encrypted_signed_cookie_salt'"
   (apply create-session-handling-function
          (fn [message signature-secret encryption-secret]
-           (let [iv (generate-random-iv)
-                 json-message (json-generate-bytes message)
-                 encrypted-message (encrypt json-message encryption-secret iv)
-                 data (encode-and-combine encrypted-message iv)]
-             (add-signature data signature-secret)))
+           (let [iv (generate-random-iv)]
+             (->> message
+                  (json-generate-bytes)
+                  (encrypt encryption-secret iv)
+                  (encode-and-combine iv)
+                  (add-signature signature-secret))))
          args))
