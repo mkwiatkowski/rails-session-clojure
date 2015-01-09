@@ -4,6 +4,14 @@
 
 (set! *warn-on-reflection* true)
 
+(deftest test-create-session-encryptor
+  (let [secret-key-base "abcd"
+        encrypt-session (create-session-encryptor secret-key-base)]
+
+    (testing "encrypt-session successfully encrypts hash into a string"
+      (is (= "aDA3ZDdzYkQ5MUZlYXZlN0I1cWRRQT09LS1ZV0ZoWVdKaVltSmpZMk5qWkdSa1pBPT0=--42e6e21f6b2784e6cdd4dde35bc63f9d1f12a183"
+             (encrypt-session {"some" "data"}))))))
+
 (deftest test-create-session-decryptor
   (let [secret-key-base "abcd"
         decrypt-session (create-session-decryptor secret-key-base)]
@@ -32,3 +40,11 @@
     (testing "decrypt-session returns nil when decryption fails"
       ;; iv decodes on second pass to "itissixteenbytes", but fails on decrypting
       (is (nil? (decrypt-session "dGVzdC0tYVhScGMzTnBlSFJsWlc1aWVYUmxjdz09--9cea6add243a54f9390dd780b94024464ab37c73"))))))
+
+(deftest test-encrypt-decrypt-interaction
+  (let [secret-key-base "super secret"
+        encrypt (create-session-encryptor secret-key-base)
+        decrypt (create-session-decryptor secret-key-base)
+        value   {"string" "value", "number" 42, "array" [1 2]}]
+    (testing "decrypt should successfully decrypt what encrypt encrypted"
+      (is (= value (decrypt (encrypt value)))))))

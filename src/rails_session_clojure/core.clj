@@ -27,6 +27,18 @@
 (defn- separate-data-and-padding [message]
   (str/split message #"--"))
 
+(defn- combine-data-and-padding [data padding]
+  (str data #"--" padding))
+
+(defn- separate-and-decode [message]
+  (map #(base64/decode-bytes (.getBytes %)) (separate-data-and-padding message)))
+
+(defn- encode-and-combine [data padding]
+  (apply combine-data-and-padding (map #(String. (base64/encode-bytes %)) [data padding])))
+
+(defn- generate-random-iv []
+  (.getBytes "aaaabbbbccccdddd")) ;; TODO
+
 (defn- verify-signature
   "Returns data section of the message if the signature is valid or nil otherwise.
   message - (String) message to be validated
@@ -37,39 +49,44 @@
     (if (and data
              received-digest
              (crypto/eq? received-digest (pandect/sha1-hmac data secret)))
-      (base64/decode data "ASCII"))))
+      (base64/decode data))))
 
-;; Based on https://github.com/clavoie/lock-key
-(defn- get-cipher
-  "Returns an AES/CBC/PKCS5Padding Cipher which can be used to encrypt or decrypt a
-  byte[], depending on the mode of the Cipher.
-  mode     - (int) see https://docs.oracle.com/javase/7/docs/api/javax/crypto/Cipher.html
-                   for available modes. Typically this will be either Cipher/ENCRYPT_MODE
-                   or Cipher/DECRYPT_MODE.
-  seed     - (String) the encryption seed / secret
-  iv-bytes - (byte[]) the initialization vector"
-  ^Cipher
-  [mode seed iv-bytes]
-  (let [key-spec (SecretKeySpec. seed "AES")
-        iv-spec  (IvParameterSpec. iv-bytes)
-        cipher   (Cipher/getInstance "AES/CBC/NoPadding")]
-    (.init cipher (int mode) key-spec iv-spec)
-    cipher))
+(defn- add-signature
+  "Returns a base64-encoded message combined with its signature.
+  message - (String) message to generate signature for
+  secret  - (byte[]) secret to be used during hashing"
+  [message secret]
+  ^String
+  (let [encoded-message (base64/encode message)
+        signature (pandect/sha1-hmac encoded-message secret)]
+    (combine-data-and-padding encoded-message signature)))
+
+(defn- json-parse-bytes [message]
+  (json/parse-string (String. message)))
+
+(defn- json-generate-bytes [message]
+  (.getBytes (json/generate-string message)))
 
 (defn- run-crypto
-  "Returns crypted/decrypted message depending on mode. Returns nil when unsuccessful.
-  mode    - (int)    Cipher/ENCRYPT_MODE or Cipher/DECRYPT_MODE
-  message - (String) message to be decrypted
-  secret  - (byte[]) encryption secret"
-  [mode message secret]
-  ^String
-  (try
-    (let [[data iv] (map #(base64/decode-bytes (.getBytes %)) (separate-data-and-padding message))
-          cipher (get-cipher mode secret iv)]
-      (String. (.doFinal cipher data 0 (count data))))
-    (catch java.lang.IllegalArgumentException _ nil)
-    (catch java.security.InvalidAlgorithmParameterException _ nil)
-    (catch javax.crypto.IllegalBlockSizeException _ nil)))
+  "Returns crypted/decrypted message depending on mode. Raises an exception
+  when unsuccessful.
+  mode   - (int)    Cipher/ENCRYPT_MODE or Cipher/DECRYPT_MODE
+  secret - (byte[]) encryption secret
+  data   - (byte[]) data to be en/de-crypted
+  iv     - (byte[]) initialization vector"
+  [mode data secret iv]
+  ^bytes
+  (let [key-spec (SecretKeySpec. secret "AES")
+        iv-spec  (IvParameterSpec. iv)
+        cipher   (Cipher/getInstance "AES/CBC/PKCS5Padding")]
+    (.init cipher (int mode) key-spec iv-spec)
+    (.doFinal cipher data)))
+
+(defn decrypt [data secret iv]
+  (run-crypto Cipher/DECRYPT_MODE data secret iv))
+
+(defn encrypt [data secret iv]
+  (run-crypto Cipher/ENCRYPT_MODE data secret iv))
 
 (def default-signature-salt "signed encrypted cookie")
 (def default-encryption-salt "encrypted cookie")
@@ -88,14 +105,35 @@
        (callback message signature-secret encryption-secret)))))
 
 (defn create-session-decryptor [& args]
-  "Returns a function that when called will decode an encoded session string.
+  "Returns a function that when called will verify signature, decode an encoded session string
+  and deserialize the resulting json data into a map structure.
 
   secret-key-base - (String) value of secret_key_base usually found in config/secrets.yml
   signature-salt  - (String) value of 'config.action_dispatch.encrypted_cookie_salt'
   encryption-salt - (String) value of 'config.action_dispatch.encrypted_signed_cookie_salt'"
   (apply create-session-handling-function
          (fn [message signature-secret encryption-secret]
-           (if-let [verified-message (verify-signature message signature-secret)]
-             (if-let [decrypted-message (run-crypto Cipher/DECRYPT_MODE verified-message encryption-secret)]
-               (json/parse-string decrypted-message))))
+           (try
+             (if-let [verified-message (verify-signature message signature-secret)]
+               (let [[data iv] (separate-and-decode verified-message)
+                     decrypted-message (decrypt data encryption-secret iv)]
+                 (json-parse-bytes decrypted-message)))
+             (catch java.lang.IllegalArgumentException _ nil)
+             (catch java.security.InvalidAlgorithmParameterException _ nil)
+             (catch javax.crypto.IllegalBlockSizeException _ nil)))
+         args))
+
+(defn create-session-encryptor [& args]
+  "Returns a function that when called will serialize session hash to json, sign it and encode it.
+
+  secret-key-base - (String) value of secret_key_base usually found in config/secrets.yml
+  signature-salt  - (String) value of 'config.action_dispatch.encrypted_cookie_salt'
+  encryption-salt - (String) value of 'config.action_dispatch.encrypted_signed_cookie_salt'"
+  (apply create-session-handling-function
+         (fn [message signature-secret encryption-secret]
+           (let [iv (generate-random-iv)
+                 json-message (json-generate-bytes message)
+                 encrypted-message (encrypt json-message encryption-secret iv)
+                 data (encode-and-combine encrypted-message iv)]
+             (add-signature data signature-secret)))
          args))
