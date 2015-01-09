@@ -100,13 +100,14 @@
    [(pbkdf2 secret-key-base signature-salt 64)
     (pbkdf2 secret-key-base encryption-salt 32)]))
 
-(defn create-session-decryptor [& config]
+(defn create-session-decryptor
   "Returns a function that when called will verify signature, decrypt a session
   string and deserialize the resulting json data into a map structure.
 
   secret-key-base - (String) value of secret_key_base usually found in config/secrets.yml
   signature-salt  - (String) value of 'config.action_dispatch.encrypted_cookie_salt'
   encryption-salt - (String) value of 'config.action_dispatch.encrypted_signed_cookie_salt'"
+  [& config]
   (let [[signature-secret encryption-secret] (apply calculate-secrets config)]
     (fn [message]
       (try
@@ -119,13 +120,14 @@
         (catch java.security.InvalidAlgorithmParameterException _ nil)
         (catch javax.crypto.IllegalBlockSizeException _ nil)))))
 
-(defn create-session-encryptor [& config]
+(defn create-session-encryptor
   "Returns a function that when called will serialize session hash to json,
   encrypt and sign it.
 
   secret-key-base - (String) value of secret_key_base usually found in config/secrets.yml
   signature-salt  - (String) value of 'config.action_dispatch.encrypted_cookie_salt'
   encryption-salt - (String) value of 'config.action_dispatch.encrypted_signed_cookie_salt'"
+  [& config]
   (let [[signature-secret encryption-secret] (apply calculate-secrets config)]
     (fn [message]
       (let [iv (generate-random-iv)]
