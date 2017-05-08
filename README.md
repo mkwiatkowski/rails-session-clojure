@@ -48,6 +48,21 @@ In a Rails app you will find those values in
   (create-session-decryptor secret-key-base custom-signature-salt custom-encryption-salt))
 ```
 
+
+### Not working?
+
+Despite correct settings decryption might not work.
+Certain JVMs by default restrict longer encryption keys, to disable that behaviour call:
+
+```clojure
+
+(require '[rails-session-clojure.core :as rsc])
+(rsc/disable-crypto-restriction!)
+
+```
+
+when your application starts.
+
 ## Documentation
 
 * [API Docs](http://mkwiatkowski.github.io/rails-session-clojure/index.html)

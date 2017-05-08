@@ -10,6 +10,16 @@
    [crypto.random :as random]
    [pandect.core :as pandect]))
 
+(defn disable-crypto-restriction!
+  "Disable JCE restrictions to enable strong encryption. Call this function
+  if crypto doesn't work despite correct settings.
+  Note: applies only to Oracle's JVM."
+  []
+  (let [field (.getDeclaredField (Class/forName "javax.crypto.JceSecurity") "isRestricted")]
+    (doto field
+      (.setAccessible true)
+      (.set nil false))))
+
 ;; Based on http://adambard.com/blog/3-wrong-ways-to-store-a-password/
 (defn pbkdf2
   "Returns bytes array of the specified length derived from applying PBKDF2
