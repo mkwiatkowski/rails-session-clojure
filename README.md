@@ -7,7 +7,7 @@ applications in version 4.x.
 
 To install, add the following to your project `:dependencies`:
 
-    [rails-session-clojure "0.1.0"]
+    [rails-session-clojure "0.2.0"]
 
 ## Usage
 
