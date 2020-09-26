@@ -14,7 +14,12 @@ applications in version 4.x.
 
 To install, add the following to your project `:dependencies`:
 
-    [rails-session-clojure "0.2.0"]
+[![Clojars Project](https://img.shields.io/clojars/v/lukaszkorecki/rails-session-clojure.svg)](https://clojars.org/lukaszkorecki/rails-session-clojure)
+
+```
+[lukaszkorecki/rails-session-clojure "0.3.0-SNAPSHOT"]
+```
+
 
 ## Usage
 
