@@ -1,7 +1,7 @@
 (ns rails-session-clojure.core-test
   (:require
-    [clojure.test :refer :all]
-    [rails-session-clojure.core :refer :all]))
+    [clojure.test :refer [deftest is testing]]
+    [rails-session-clojure.core :as rsc]))
 
 
 (set! *warn-on-reflection* true)
@@ -9,7 +9,7 @@
 
 (deftest test-create-session-encryptor
   (let [secret-key-base "abcd"
-        encrypt-session (create-session-encryptor secret-key-base)]
+        encrypt-session (rsc/create-session-encryptor secret-key-base)]
 
     (testing "encrypt-session successfully encrypts hash into a string"
       (let [value (encrypt-session {"some" "data"})]
@@ -19,7 +19,7 @@
 
 (deftest test-create-session-decryptor
   (let [secret-key-base "abcd"
-        decrypt-session (create-session-decryptor secret-key-base)]
+        decrypt-session (rsc/create-session-decryptor secret-key-base)]
 
     (testing "decrypt-session successfully decrypts value into a hash"
       ;; typical rails session
@@ -49,8 +49,8 @@
 
 (deftest test-create-session-encryptor-decryptor-interaction
   (let [secret-key-base "super secret"
-        encrypt (create-session-encryptor secret-key-base)
-        decrypt (create-session-decryptor secret-key-base)
+        encrypt (rsc/create-session-encryptor secret-key-base)
+        decrypt (rsc/create-session-decryptor secret-key-base)
         value   {"string" "value", "number" 42, "array" [1 2]}]
     (testing "decrypt should successfully decrypt what encrypt encrypted"
       (is (= value (decrypt (encrypt value)))))))
@@ -61,16 +61,16 @@
         message "hello world"]
     (testing "verify-signature should return message signed with add-signature"
       (is (= message
-             (verify-signature (add-signature secret message) secret))))
+             (rsc/verify-signature (rsc/add-signature secret message) secret))))
     (testing "verify-signature should return nil when given a wrong secret"
-      (is (nil? (verify-signature (add-signature secret message) "wrong-secret"))))))
+      (is (nil? (rsc/verify-signature (rsc/add-signature secret message) "wrong-secret"))))))
 
 
 (deftest test-calculate-secrets
   (let [secret-key-base "secret"]
     (testing "calculate-secrets should return two secrets"
-      (is (= 2 (count (calculate-secrets secret-key-base)))))
+      (is (= 2 (count (rsc/calculate-secrets secret-key-base)))))
     (testing "calculate-secrets' first secret should have length of 64"
-      (is (= 64 (count (first (calculate-secrets secret-key-base))))))
+      (is (= 64 (count (first (rsc/calculate-secrets secret-key-base))))))
     (testing "calculate-secrets' second secret should have length of 32"
-      (is (= 32 (count (second (calculate-secrets secret-key-base))))))))
+      (is (= 32 (count (second (rsc/calculate-secrets secret-key-base))))))))

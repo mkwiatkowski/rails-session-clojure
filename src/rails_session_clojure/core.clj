@@ -69,7 +69,7 @@
   [message secret]
   ^String
   (let [[data received-digest] (separate-data-and-padding message)]
-    (if (and data
+    (when (and data
              received-digest
              (crypto/eq? received-digest (pandect/sha1-hmac data secret)))
       (base64/decode data))))
@@ -142,7 +142,7 @@
   (let [[signature-secret encryption-secret] (apply calculate-secrets config)]
     (fn [message]
       (try
-        (if-let [verified-message (verify-signature message signature-secret)]
+        (when-let [verified-message (verify-signature message signature-secret)]
           (let [[data iv] (separate-and-decode verified-message)]
             (->> data
                  (decrypt encryption-secret iv)
