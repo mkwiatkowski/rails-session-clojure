@@ -1,8 +1,11 @@
 (ns rails-session-clojure.core-test
-  (:require [clojure.test :refer :all]
-            [rails-session-clojure.core :refer :all]))
+  (:require
+    [clojure.test :refer :all]
+    [rails-session-clojure.core :refer :all]))
+
 
 (set! *warn-on-reflection* true)
+
 
 (deftest test-create-session-encryptor
   (let [secret-key-base "abcd"
@@ -10,8 +13,9 @@
 
     (testing "encrypt-session successfully encrypts hash into a string"
       (let [value (encrypt-session {"some" "data"})]
-        (is (= (string? value)))
+        (is (string? value))
         (is (= 110 (count value)))))))
+
 
 (deftest test-create-session-decryptor
   (let [secret-key-base "abcd"
@@ -42,6 +46,7 @@
       ;; iv decodes on second pass to "itissixteenbytes", but fails on decrypting
       (is (nil? (decrypt-session "dGVzdC0tYVhScGMzTnBlSFJsWlc1aWVYUmxjdz09--9cea6add243a54f9390dd780b94024464ab37c73"))))))
 
+
 (deftest test-create-session-encryptor-decryptor-interaction
   (let [secret-key-base "super secret"
         encrypt (create-session-encryptor secret-key-base)
@@ -49,6 +54,7 @@
         value   {"string" "value", "number" 42, "array" [1 2]}]
     (testing "decrypt should successfully decrypt what encrypt encrypted"
       (is (= value (decrypt (encrypt value)))))))
+
 
 (deftest test-add-verify-signature-interaction
   (let [secret "abcd"
@@ -58,6 +64,7 @@
              (verify-signature (add-signature secret message) secret))))
     (testing "verify-signature should return nil when given a wrong secret"
       (is (nil? (verify-signature (add-signature secret message) "wrong-secret"))))))
+
 
 (deftest test-calculate-secrets
   (let [secret-key-base "secret"]

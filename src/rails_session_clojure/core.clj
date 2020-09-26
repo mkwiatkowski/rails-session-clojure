@@ -1,14 +1,20 @@
 (ns rails-session-clojure.core
-  (:import
-   [javax.crypto.spec SecretKeySpec IvParameterSpec PBEKeySpec]
-   [javax.crypto Cipher SecretKeyFactory])
   (:require
-   [base64-clj.core :as base64]
-   [cheshire.core :as json]
-   [clojure.string :as str]
-   [crypto.equality :as crypto]
-   [crypto.random :as random]
-   [pandect.core :as pandect]))
+    [cheshire.core :as json]
+    [clojure.string :as str]
+    [crypto.equality :as crypto]
+    [crypto.random :as random]
+    [pandect.algo.sha1 :as pandect]
+    [rails-session-clojure.base64 :as base64])
+  (:import
+    (javax.crypto
+      Cipher
+      SecretKeyFactory)
+    (javax.crypto.spec
+      IvParameterSpec
+      PBEKeySpec
+      SecretKeySpec)))
+
 
 (defn disable-crypto-restriction!
   "Disable JCE restrictions to enable strong encryption. Call this function
@@ -31,24 +37,30 @@
   ^bytes
   (let [iterations 1000
         key-size (* size-in-bytes 8)
-        key-spec (PBEKeySpec. (.toCharArray key) (.getBytes salt) iterations key-size)
+        key-spec (PBEKeySpec. (.toCharArray  ^String key) (.getBytes ^String salt) iterations key-size)
         factory (SecretKeyFactory/getInstance "PBKDF2WithHmacSHA1")]
     (.getEncoded (.generateSecret factory key-spec))))
+
 
 (defn separate-data-and-padding [message]
   (str/split message #"--"))
 
+
 (defn combine-data-and-padding [data padding]
   (str data #"--" padding))
 
+
 (defn separate-and-decode [message]
-  (map #(base64/decode-bytes (.getBytes %)) (separate-data-and-padding message)))
+  (map #(base64/decode-bytes (.getBytes ^String %)) (separate-data-and-padding message)))
+
 
 (defn encode-and-combine [padding data]
-  (apply combine-data-and-padding (map #(String. (base64/encode-bytes %)) [data padding])))
+  (apply combine-data-and-padding (map #(String. ^bytes (base64/encode-bytes %)) [data padding])))
+
 
 (defn generate-random-iv []
   (random/bytes 16))
+
 
 (defn verify-signature
   "Returns data section of the message if the signature is valid or nil otherwise.
@@ -62,6 +74,7 @@
              (crypto/eq? received-digest (pandect/sha1-hmac data secret)))
       (base64/decode data))))
 
+
 (defn add-signature
   "Returns a base64-encoded message combined with its signature.
   secret  - (byte[]) secret to be used during hashing
@@ -72,11 +85,14 @@
         signature (pandect/sha1-hmac encoded-message secret)]
     (combine-data-and-padding encoded-message signature)))
 
-(defn json-parse-bytes [message]
-  (json/parse-string (String. message)))
+
+(defn json-parse-bytes [^bytes message]
+  (json/parse-string (String. message "UTF-8")))
+
 
 (defn json-generate-bytes [message]
   (.getBytes (json/generate-string message)))
+
 
 (defn run-crypto
   "Returns crypted/decrypted message depending on mode. Raises an exception
@@ -93,14 +109,18 @@
     (.init cipher (int mode) key-spec iv-spec)
     (.doFinal cipher data)))
 
+
 (defn decrypt [secret iv data]
   (run-crypto Cipher/DECRYPT_MODE secret iv data))
+
 
 (defn encrypt [secret iv data]
   (run-crypto Cipher/ENCRYPT_MODE secret iv data))
 
+
 (def default-signature-salt "signed encrypted cookie")
 (def default-encryption-salt "encrypted cookie")
+
 
 (defn calculate-secrets
   "Returns signature and encryption secrets in a vector."
@@ -109,6 +129,7 @@
   ([secret-key-base signature-salt encryption-salt]
    [(pbkdf2 secret-key-base signature-salt 64)
     (pbkdf2 secret-key-base encryption-salt 32)]))
+
 
 (defn create-session-decryptor
   "Returns a function that when called will verify signature, decrypt a session
@@ -129,6 +150,7 @@
         (catch java.lang.IllegalArgumentException _ nil)
         (catch java.security.InvalidAlgorithmParameterException _ nil)
         (catch javax.crypto.IllegalBlockSizeException _ nil)))))
+
 
 (defn create-session-encryptor
   "Returns a function that when called will serialize session hash to json,

@@ -3,11 +3,10 @@
   :url "https://github.com/mkwiatkowski/rails-session-clojure"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[base64-clj "0.1.1"]
-                 [cheshire "5.4.0"]
+  :dependencies [[cheshire "5.10.0"]
                  [crypto-equality "1.0.0"]
                  [crypto-random "1.2.0"]
-                 [org.clojure/clojure "1.8.0"]
+                 [org.clojure/clojure "1.10.1"]
                  [pandect "0.6.1"]]
   :plugins [[codox "0.8.10"]]
   :codox {:src-dir-uri "https://github.com/mkwiatkowski/rails-session-clojure/blob/master/"
