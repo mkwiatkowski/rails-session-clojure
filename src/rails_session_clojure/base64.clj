@@ -12,8 +12,7 @@
 
 (def bytes-class (class (.getBytes "")))
 
-;; FIXME: reflection warning!
-(defn bytes->string [^bytes b] (String. b utf-8))
+(defn bytes->string [^bytes b] (String. ^bytes b ^String utf-8))
 
 
 (defn encode-bytes [bytes]
